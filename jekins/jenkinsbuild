@@ -1,0 +1,60 @@
+pipeline {
+    agent {
+       node {
+    		label 'awsvm'
+    		}
+    }
+
+     options    {
+                timestamps()
+                buildDiscarder(logRotator(numToKeepStr: '2', artifactNumToKeepStr: '2'))
+                timeout(time: 120, unit: 'MINUTES')
+                disableConcurrentBuilds()
+                }
+
+
+    parameters {
+            string(name: 'appBranch', defaultValue: 'master', description: "Application Branch name of the Repo")
+                
+                }            
+
+
+    stages {
+        stage('checkout') {
+            steps {
+                git branch: appBranch, url: 'https://github.com/bharath574/aws-amven-app.git'
+            }
+        }
+        stage('Maven Build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'cd aws-amven-app; docker build . -f dockerfile_testapp -t bharath5747/awsmavendemo:latest'
+
+            }
+        }  
+
+        stage('Docker Login') {
+            steps {
+
+            withCredentials([usernamePassword(credentialsId: 'dockerlogin', passwordVariable: 'dockerpwd', usernameVariable: 'dockeruser')]) {
+    
+                   sh 'docker login -u ${dockeruser} -p ${dockerpwd}'
+                }
+
+            }
+        }              
+
+
+        stage('Docker Push') {
+            steps {
+                sh 'docker push bharath5747/awsmavendemo:latest'
+
+            }
+        } 
+    }
+}
